@@ -17,8 +17,7 @@ read_stdin :: proc() {
 		if !bufio.scanner_scan(&scanner) do break
 
 		line := bufio.scanner_text(&scanner)
-		fmt.printf("%s: command not found", line)
-		break
+		fmt.printf("%s: command not found\n", line)
 	}
 
 }
