@@ -17,6 +17,11 @@ read_stdin :: proc() {
 		if !bufio.scanner_scan(&scanner) do break
 
 		line := bufio.scanner_text(&scanner)
+
+		if line == "exit" {
+			break
+		}
+
 		fmt.printf("%s: command not found\n", line)
 	}
 
