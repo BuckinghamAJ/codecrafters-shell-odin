@@ -55,9 +55,17 @@ execute_command :: proc(command, params: string) -> (should_exit: bool) {
 	case "echo":
 		fmt.println(params)
 	case "type":
-		_, exists := builtins[params]
-		if exists do fmt.println(fmt.tprintf("%s is a shell builtin", params))
-		else do fmt.println(fmt.tprintf("%s: not found", params))
+		if _, exists := builtins[params]; exists {
+			fmt.println(fmt.tprintf("%s is a shell builtin", params))
+			break
+		}
+
+		if cmd_path, ok := path_search(params); ok {
+			fmt.println(fmt.tprintf("%s is %s", params, cmd_path))
+			break
+		}
+
+		fmt.println(fmt.tprintf("%s: not found", params))
 	case:
 		display_error(Exception {
 			Shell_Error.Invalid_Command,
