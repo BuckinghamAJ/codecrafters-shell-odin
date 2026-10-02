@@ -1,3 +1,4 @@
+#+feature dynamic-literals
 package main
 
 import "base:runtime"
@@ -22,12 +23,13 @@ Exception :: struct {
 }
 
 
+builtins : map[string]bool
+
 read_stdin :: proc() {
 	scanner: bufio.Scanner
 
 	stdin := os.to_stream(os.stdin)
 	bufio.scanner_init(&scanner, stdin, context.temp_allocator)
-
 
 	for {
 		fmt.printf("$ ")
@@ -42,47 +44,28 @@ read_stdin :: proc() {
 		command := input[0]
 		params := input[1] if len(input) > 1 else ""
 
-		execute_command(command, params)
+		if execute_command(command, params) do return
 	}
 }
 
-execute_command :: proc(command, params: string) {
+execute_command :: proc(command, params: string) -> (should_exit: bool) {
 	switch command {
 	case "exit":
-		os.exit(0)
+		return true
 	case "echo":
 		fmt.println(params)
+	case "type":
+		_, exists := builtins[params]
+		if exists do fmt.println(fmt.tprintf("%s is a shell builtin", params))
+		else do fmt.println(fmt.tprintf("%s: not found", params))
 	case:
 		display_error(Exception {
 			Shell_Error.Invalid_Command,
 			fmt.tprintf("%s: command not found", command),
 		})
 	}
+	return false
 }
-
-// REFACTOR:
-// shell_loop :: proc() {
-// 	fmt.printf("$ ")
-// 	if !bufio.scanner_scan(&scanner) do break
-//
-// 	line := bufio.scanner_text(&scanner)
-// 	input, err := strings.split_n(line, " ", 1)
-// 	if err != nil {
-// 		return Exception{err, fmt.tprintf("Error with string splitting: %v", err)}
-// 	}
-//
-// 	command := input[0]
-// 	params := input[1] if len(input) > 1 else ""
-//
-// 	if command == "exit" {
-// 		break
-// 	}
-//
-// 	return Exception {
-// 		Shell_Error.Invalid_Command,
-// 		fmt.tprintf("%s: command not found", command),
-// 	}
-// }
 
 display_error :: proc(err: Exception) {
 	switch value in err.error {
@@ -96,6 +79,13 @@ display_error :: proc(err: Exception) {
 }
 
 main :: proc() {
+	builtins = {
+		"exit" = true,
+		"echo" = true,
+		"type" = true,
+	}
+	defer delete(builtins)
+
 	read_stdin()
 
 }
