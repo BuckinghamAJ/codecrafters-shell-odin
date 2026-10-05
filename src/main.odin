@@ -100,6 +100,7 @@ main :: proc() {
 		"exit" = true,
 		"echo" = true,
 		"type" = true,
+		"pwd" = true,
 	}
 	defer delete(builtins)
 
