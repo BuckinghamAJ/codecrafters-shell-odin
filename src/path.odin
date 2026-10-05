@@ -5,6 +5,7 @@ import "core:fmt"
 import "core:strings"
 import "core:os"
 
+@(require_results)
 path_search :: proc(command: string) -> (path: string, found: bool) {
 	path_env := os.get_env("PATH", context.temp_allocator)
 	paths := strings.split(path_env, ":")

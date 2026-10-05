@@ -15,6 +15,7 @@ Shell_Error :: enum byte {
 Error :: union {
 	Shell_Error,
 	runtime.Allocator_Error,
+	os.Error
 }
 
 Exception :: struct {
@@ -67,6 +68,31 @@ execute_command :: proc(command, params: string) -> (should_exit: bool) {
 
 		fmt.println(fmt.tprintf("%s: not found", params))
 	case:
+		if cmd_path, ok := path_search(command); ok {
+			process_desc := os.Process_Desc{
+				working_dir = "",
+				command = []string{cmd_path, params},
+				env = nil,
+				stdin = nil,
+				stdout = nil,
+				stderr = nil,
+			}
+
+			s, stdout, stderr , err :=  os.process_exec(process_desc, context.temp_allocator)
+			if err != nil {
+				display_error(Exception{err, fmt.tprintf("Error executing command %s: %v", command, err)})
+				break
+			}
+
+			for !s.exited {}
+
+			if s.success do fmt.println(string(stdout))
+			else do fmt.println(string(stderr))
+
+
+			break
+		}
+
 		display_error(Exception {
 			Shell_Error.Invalid_Command,
 			fmt.tprintf("%s: command not found", command),
@@ -77,7 +103,7 @@ execute_command :: proc(command, params: string) -> (should_exit: bool) {
 
 display_error :: proc(err: Exception) {
 	switch value in err.error {
-	case Shell_Error, runtime.Allocator_Error:
+	case Shell_Error, runtime.Allocator_Error, os.Error:
 		switch value {
 		case Shell_Error.None, runtime.Allocator_Error.None:
 			break
