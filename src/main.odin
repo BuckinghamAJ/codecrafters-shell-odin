@@ -1,6 +1,7 @@
 #+feature dynamic-literals
 package main
 
+import "core:slice"
 import "base:runtime"
 import "core:bufio"
 import "core:fmt"
@@ -69,9 +70,15 @@ execute_command :: proc(command, params: string) -> (should_exit: bool) {
 		fmt.println(fmt.tprintf("%s: not found", params))
 	case:
 		if cmd_path, ok := path_search(command); ok {
+
+			args := strings.split(params, " ")
+
+			process_cmd := [dynamic]string{cmd_path}
+			append(&process_cmd, ..args[:])
+
 			process_desc := os.Process_Desc{
 				working_dir = "",
-				command = []string{cmd_path, params},
+				command = process_cmd[:],
 				env = nil,
 				stdin = nil,
 				stdout = nil,
