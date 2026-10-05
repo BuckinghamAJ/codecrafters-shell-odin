@@ -93,8 +93,8 @@ execute_command :: proc(command, params: string) -> (should_exit: bool) {
 
 			for !s.exited {}
 
-			if s.success do fmt.println(string(stdout))
-			else do fmt.println(string(stderr))
+			if s.success do fmt.printf(string(stdout))
+			else do fmt.printf(string(stderr))
 
 
 			break
