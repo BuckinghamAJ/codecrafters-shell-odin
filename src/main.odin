@@ -73,7 +73,7 @@ execute_command :: proc(command, params: string) -> (should_exit: bool) {
 
 			args := strings.split(params, " ")
 
-			process_cmd := [dynamic]string{cmd_path}
+			process_cmd := [dynamic]string{command}
 			append(&process_cmd, ..args[:])
 
 			process_desc := os.Process_Desc{
