@@ -57,7 +57,12 @@ execute_command :: proc(command, params: string) -> (should_exit: bool) {
 	case "echo":
 		fmt.println(params)
 	case "pwd":
-		execute("pwd", "-L")
+		cwd, err := os.get_working_directory(context.temp_allocator)
+		if err != nil {
+			display_error(Exception{err, fmt.tprintf("Error getting working directory: %v", err)})
+			break
+		}
+		fmt.println(cwd)
 	case "type":
 		if _, exists := builtins[params]; exists {
 			fmt.println(fmt.tprintf("%s is a shell builtin", params))
