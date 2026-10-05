@@ -56,6 +56,8 @@ execute_command :: proc(command, params: string) -> (should_exit: bool) {
 		return true
 	case "echo":
 		fmt.println(params)
+	case "pwd":
+		execute("pwd", "-L")
 	case "type":
 		if _, exists := builtins[params]; exists {
 			fmt.println(fmt.tprintf("%s is a shell builtin", params))
@@ -70,33 +72,7 @@ execute_command :: proc(command, params: string) -> (should_exit: bool) {
 		fmt.println(fmt.tprintf("%s: not found", params))
 	case:
 		if cmd_path, ok := path_search(command); ok {
-
-			args := strings.split(params, " ")
-
-			process_cmd := [dynamic]string{command}
-			append(&process_cmd, ..args[:])
-
-			process_desc := os.Process_Desc{
-				working_dir = "",
-				command = process_cmd[:],
-				env = nil,
-				stdin = nil,
-				stdout = nil,
-				stderr = nil,
-			}
-
-			s, stdout, stderr , err :=  os.process_exec(process_desc, context.temp_allocator)
-			if err != nil {
-				display_error(Exception{err, fmt.tprintf("Error executing command %s: %v", command, err)})
-				break
-			}
-
-			for !s.exited {}
-
-			if s.success do fmt.printf(string(stdout))
-			else do fmt.printf(string(stderr))
-
-
+			execute(command, params)
 			break
 		}
 
