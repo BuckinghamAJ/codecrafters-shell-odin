@@ -36,12 +36,18 @@ execute :: proc(command, params: string) {
 }
 
 cd :: proc(path: string) -> Error {
-	if path == "" {
+	switch path {
+	case "":
 		os.change_directory("/") or_return
+	case "~":
+		hom_dir := os.get_env("HOME", context.temp_allocator)
+		os.change_directory(hom_dir) or_return
+	case:
+		if !os.is_dir(path) do return Shell_Error.Invalid_Command
+
+		os.change_directory(path) or_return
+		return Shell_Error.None
 	}
 
-	if !os.is_dir(path) do return Shell_Error.Invalid_Command
-
-	os.change_directory(path) or_return
 	return Shell_Error.None
 }
