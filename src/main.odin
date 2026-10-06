@@ -63,6 +63,12 @@ execute_command :: proc(command, params: string) -> (should_exit: bool) {
 			break
 		}
 		fmt.println(cwd)
+	case "cd":
+		err := cd(params)
+		if err != Shell_Error.None{
+			display_error(Exception{err, fmt.tprintf("cd: %s: No such file or directory", params)})
+			break
+		}
 	case "type":
 		if _, exists := builtins[params]; exists {
 			fmt.println(fmt.tprintf("%s is a shell builtin", params))
@@ -106,6 +112,7 @@ main :: proc() {
 		"echo" = true,
 		"type" = true,
 		"pwd" = true,
+		"cd" = true,
 	}
 	defer delete(builtins)
 

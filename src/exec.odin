@@ -34,3 +34,14 @@ execute :: proc(command, params: string) {
 
 	return
 }
+
+cd :: proc(path: string) -> Error {
+	if path == "" {
+		os.change_directory("/") or_return
+	}
+
+	if !os.is_dir(path) do return Shell_Error.Invalid_Command
+
+	os.change_directory(path) or_return
+	return Shell_Error.None
+}
