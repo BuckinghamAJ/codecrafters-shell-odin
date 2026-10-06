@@ -44,10 +44,25 @@ read_stdin :: proc() {
 		}
 
 		command := input[0]
-		params := input[1] if len(input) > 1 else ""
+		params := clean_params(input[1]) if len(input) > 1 else ""
 
 		if execute_command(command, params) do return
 	}
+}
+
+clean_params :: proc(p: string) -> (res: string) {
+	res = p
+	single_quote_count := strings.count(p, "'")
+
+	if single_quote_count % 2 != 0 || single_quote_count == 0 {
+		space_count := strings.count(res, " ")
+		res, _ = strings.replace(res, " ", "", space_count-1)
+	}
+
+
+	res, _ = strings.replace_all(res, "'", "")
+
+	return res
 }
 
 execute_command :: proc(command, params: string) -> (should_exit: bool) {
