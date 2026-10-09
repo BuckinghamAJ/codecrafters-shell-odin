@@ -50,10 +50,6 @@ read_stdin :: proc() {
 	}
 }
 
-Param :: struct {
-
-}
-
 previous_char :: proc(b : ^strings.Builder) -> (prev: rune, has_previous: bool) {
 	if len(b.buf) == 0 do return
 	else do return rune(b.buf[len(b.buf)-1]), true
