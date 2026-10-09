@@ -56,17 +56,19 @@ previous_char :: proc(b : ^strings.Builder) -> (prev: rune, has_previous: bool) 
 }
 
 clean_params :: proc(p: string) -> (res: []string) {
-	// TODO need to parse through the characters of the string this and make a struct
 	r : [dynamic]string
 	sb := strings.builder_make()
 	defer strings.builder_destroy(&sb)
-	in_quote := false
+	in_single_quote := false
+	in_double_quote := false
 
 	for c, idx in p {
 		switch {
-		case c == '\'':
-			in_quote = !in_quote
-		case c == ' ' && !in_quote:
+		case c == '\'' && !in_double_quote:
+			in_single_quote = !in_single_quote
+		case c == '"' && !in_single_quote:
+			in_double_quote = !in_double_quote
+		case c == ' ' && !in_single_quote && !in_double_quote:
 			if strings.builder_len(sb) == 0 do continue
 			append(&r, strings.clone(strings.to_string(sb)))
 			strings.builder_reset(&sb)
