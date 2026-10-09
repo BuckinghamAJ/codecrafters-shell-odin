@@ -39,12 +39,18 @@ read_stdin :: proc() {
 
 		line := bufio.scanner_text(&scanner)
 		input, err := strings.split_n(line, " ", 2)
+		defer delete(input)
+
 		if err != nil {
 			display_error(Exception{err, fmt.tprintf("Error with string splitting: %v", err)})
 		}
 
 		command := input[0]
 		params := clean_params(input[1]) if len(input) > 1 else []string{}
+		defer {
+			for p in params do delete(p)
+			delete(params)
+		}
 
 		if execute_command(command, params) do return
 	}
@@ -59,20 +65,24 @@ clean_params :: proc(p: string) -> (res: []string) {
 	r : [dynamic]string
 	sb := strings.builder_make()
 	defer strings.builder_destroy(&sb)
-	in_single_quote := false
-	in_double_quote := false
+	in_single := false
+	in_double := false
+	prev_backslash := false
 
 	for c, idx in p {
 		switch {
-		case c == '\'' && !in_double_quote:
-			in_single_quote = !in_single_quote
-		case c == '"' && !in_single_quote:
-			in_double_quote = !in_double_quote
-		case c == ' ' && !in_single_quote && !in_double_quote:
+		case c == '\\' && !prev_backslash:
+			prev_backslash = true
+		case c == '\'' && !in_double && !prev_backslash:
+			in_single = !in_single
+		case c == '"' && !in_single && !prev_backslash:
+			in_double = !in_double
+		case c == ' ' && !in_single && !in_double && !prev_backslash:
 			if strings.builder_len(sb) == 0 do continue
 			append(&r, strings.clone(strings.to_string(sb)))
 			strings.builder_reset(&sb)
 		case:
+			prev_backslash = false
 			strings.write_rune(&sb, c)
 		}
 	}
@@ -81,7 +91,7 @@ clean_params :: proc(p: string) -> (res: []string) {
 		append(&r, strings.clone(strings.to_string(sb)))
 	}
 
-	return slice.clone(r[:])
+	return r[:]
 }
 
 execute_command :: proc(command: string, params: []string) -> (should_exit: bool) {
