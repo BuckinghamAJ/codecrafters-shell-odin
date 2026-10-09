@@ -4,6 +4,67 @@ package main
 import "core:fmt"
 import "core:os"
 
+execute_command :: proc(command: string, params: []string) -> (should_exit: bool) {
+	switch command {
+	case "exit":
+		return true
+	case "echo":
+		for p, idx in params {
+			fmt.printf(p)
+			if len(params) - 1 != idx do fmt.print(" ")
+		}
+		fmt.println()
+	case "pwd":
+		cwd, err := os.get_working_directory(context.temp_allocator)
+		if err != nil {
+			display_error(Exception{err, fmt.tprintf("Error getting working directory: %v", err)})
+			break
+		}
+		fmt.println(cwd)
+	case "cd":
+		if len(params) == 0 {
+			break
+		}
+
+		param := params[0]
+
+		err := cd(param)
+		if err != Shell_Error.None{
+			display_error(Exception{err, fmt.tprintf("cd: %s: No such file or directory", param)})
+			break
+		}
+	case "type":
+		if len(params) == 0 {
+			break
+		}
+		param := params[0]
+
+		if _, exists := builtins[param]; exists {
+			fmt.println(fmt.tprintf("%s is a shell builtin", param))
+			break
+		}
+
+		if cmd_path, ok := path_search(param); ok {
+			fmt.println(fmt.tprintf("%s is %s", param, cmd_path))
+			break
+		}
+
+		fmt.println(fmt.tprintf("%s: not found", param))
+	case:
+		if cmd_path, ok := path_search(command); ok {
+			execute(command, params)
+			break
+		}
+
+		display_error(Exception {
+			Shell_Error.Invalid_Command,
+			fmt.tprintf("%s: command not found", command),
+		})
+	}
+	return false
+}
+
+
 execute :: proc(command: string, params: []string) {
 
 	process_cmd := [dynamic]string{command}
