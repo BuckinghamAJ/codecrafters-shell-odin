@@ -104,9 +104,15 @@ execute_command :: proc(command: string, params: []string) -> (should_exit: bool
 		}
 		fmt.println(cwd)
 	case "cd":
-		err := cd(params[0])
+		if len(params) == 0 {
+			break
+		}
+
+		param := params[0]
+
+		err := cd(param)
 		if err != Shell_Error.None{
-			display_error(Exception{err, fmt.tprintf("cd: %s: No such file or directory", params)})
+			display_error(Exception{err, fmt.tprintf("cd: %s: No such file or directory", param)})
 			break
 		}
 	case "type":
