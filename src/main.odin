@@ -71,7 +71,7 @@ clean_params :: proc(p: string) -> (res: []string) {
 
 	for c, idx in p {
 		switch {
-		case c == '\\' && !prev_backslash:
+		case c == '\\' && !prev_backslash && !in_single:
 			prev_backslash = true
 		case c == '\'' && !in_double && !prev_backslash:
 			in_single = !in_single
