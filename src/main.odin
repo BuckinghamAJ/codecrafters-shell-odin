@@ -44,33 +44,58 @@ read_stdin :: proc() {
 		}
 
 		command := input[0]
-		params := clean_params(input[1]) if len(input) > 1 else ""
+		params := clean_params(input[1]) if len(input) > 1 else []string{}
 
 		if execute_command(command, params) do return
 	}
 }
 
-clean_params :: proc(p: string) -> (res: string) {
-	res = p
-	single_quote_count := strings.count(p, "'")
+Param :: struct {
 
-	if single_quote_count % 2 != 0 || single_quote_count == 0 {
-		space_count := strings.count(res, " ")
-		res, _ = strings.replace(res, " ", "", space_count-1)
-	}
-
-
-	res, _ = strings.replace_all(res, "'", "")
-
-	return res
 }
 
-execute_command :: proc(command, params: string) -> (should_exit: bool) {
+previous_char :: proc(b : ^strings.Builder) -> (prev: rune, has_previous: bool) {
+	if len(b.buf) == 0 do return
+	else do return rune(b.buf[len(b.buf)-1]), true
+}
+
+clean_params :: proc(p: string) -> (res: []string) {
+	// TODO need to parse through the characters of the string this and make a struct
+	r : [dynamic]string
+	sb := strings.builder_make()
+	defer strings.builder_destroy(&sb)
+	in_quote := false
+
+	for c, idx in p {
+		switch {
+		case c == '\'':
+			in_quote = !in_quote
+		case c == ' ' && !in_quote:
+			if strings.builder_len(sb) == 0 do continue
+			append(&r, strings.clone(strings.to_string(sb)))
+			strings.builder_reset(&sb)
+		case:
+			strings.write_rune(&sb, c)
+		}
+	}
+
+	if strings.builder_len(sb) > 0 {
+		append(&r, strings.clone(strings.to_string(sb)))
+	}
+
+	return slice.clone(r[:])
+}
+
+execute_command :: proc(command: string, params: []string) -> (should_exit: bool) {
 	switch command {
 	case "exit":
 		return true
 	case "echo":
-		fmt.println(params)
+		for p, idx in params {
+			fmt.printf(p)
+			if len(params) - 1 != idx do fmt.print(" ")
+		}
+		fmt.println()
 	case "pwd":
 		cwd, err := os.get_working_directory(context.temp_allocator)
 		if err != nil {
@@ -79,23 +104,28 @@ execute_command :: proc(command, params: string) -> (should_exit: bool) {
 		}
 		fmt.println(cwd)
 	case "cd":
-		err := cd(params)
+		err := cd(params[0])
 		if err != Shell_Error.None{
 			display_error(Exception{err, fmt.tprintf("cd: %s: No such file or directory", params)})
 			break
 		}
 	case "type":
-		if _, exists := builtins[params]; exists {
-			fmt.println(fmt.tprintf("%s is a shell builtin", params))
+		if len(params) == 0 {
+			break
+		}
+		param := params[0]
+
+		if _, exists := builtins[param]; exists {
+			fmt.println(fmt.tprintf("%s is a shell builtin", param))
 			break
 		}
 
-		if cmd_path, ok := path_search(params); ok {
-			fmt.println(fmt.tprintf("%s is %s", params, cmd_path))
+		if cmd_path, ok := path_search(param); ok {
+			fmt.println(fmt.tprintf("%s is %s", param, cmd_path))
 			break
 		}
 
-		fmt.println(fmt.tprintf("%s: not found", params))
+		fmt.println(fmt.tprintf("%s: not found", param))
 	case:
 		if cmd_path, ok := path_search(command); ok {
 			execute(command, params)

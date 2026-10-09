@@ -5,12 +5,11 @@ import "core:strings"
 import "core:fmt"
 import "core:os"
 
-execute :: proc(command, params: string) {
-	args := strings.split(params, " ")
+execute :: proc(command: string, params: []string) {
 
 	process_cmd := [dynamic]string{command}
 	defer delete(process_cmd)
-	append(&process_cmd, ..args[:])
+	append(&process_cmd, ..params)
 
 	process_desc := os.Process_Desc{
 		working_dir = "",
