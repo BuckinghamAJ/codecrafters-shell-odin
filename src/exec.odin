@@ -4,29 +4,58 @@ package main
 import "core:fmt"
 import "core:os"
 
+contains_pipe :: proc(params: []string) -> bool {
+	for p in params {
+		if p == ">" do return true
+		if p == "1>" do return true
+	}
+	return false
+}
+
 execute_command :: proc(command: string, params: []string) -> (should_exit: bool) {
+	args : []string
+	file : ^os.File
+
+	if contains_pipe(params){
+		args = params[:len(params)-2]
+		file_name := params[len(params)-1]
+		err: os.Error
+		file, err = os.create(file_name)
+		if err != nil {
+			display_error(
+				Exception{err,
+				fmt.tprintf("Error creating file %s working directory: %v", file_name, err)})
+		}
+	}
+	else do args = params
+
+	if file == nil do file = os.stdout
+	defer {
+		if file != os.stdout do os.close(file)
+	}
+
 	switch command {
 	case "exit":
 		return true
 	case "echo":
-		for p, idx in params {
-			fmt.printf(p)
-			if len(params) - 1 != idx do fmt.print(" ")
+		for p, idx in args {
+			fmt.fprintf(file, p)
+			if len(args) - 1 != idx do fmt.fprint(file, " ")
 		}
-		fmt.println()
+		fmt.fprintln(file)
 	case "pwd":
 		cwd, err := os.get_working_directory(context.temp_allocator)
 		if err != nil {
 			display_error(Exception{err, fmt.tprintf("Error getting working directory: %v", err)})
 			break
 		}
-		fmt.println(cwd)
+		fmt.fprintln(file, cwd)
 	case "cd":
-		if len(params) == 0 {
+		if len(args) == 0 {
 			break
 		}
 
-		param := params[0]
+		param := args[0]
 
 		err := cd(param)
 		if err != Shell_Error.None{
@@ -34,25 +63,25 @@ execute_command :: proc(command: string, params: []string) -> (should_exit: bool
 			break
 		}
 	case "type":
-		if len(params) == 0 {
+		if len(args) == 0 {
 			break
 		}
-		param := params[0]
+		param := args[0]
 
 		if _, exists := builtins[param]; exists {
-			fmt.println(fmt.tprintf("%s is a shell builtin", param))
+			fmt.fprintln(file, fmt.tprintf("%s is a shell builtin", param))
 			break
 		}
 
 		if cmd_path, ok := path_search(param); ok {
-			fmt.println(fmt.tprintf("%s is %s", param, cmd_path))
+			fmt.fprintln(file, fmt.tprintf("%s is %s", param, cmd_path))
 			break
 		}
 
 		fmt.println(fmt.tprintf("%s: not found", param))
 	case:
 		if cmd_path, ok := path_search(command); ok {
-			execute(command, params)
+			execute(command, args, file)
 			break
 		}
 
@@ -61,11 +90,12 @@ execute_command :: proc(command: string, params: []string) -> (should_exit: bool
 			fmt.tprintf("%s: command not found", command),
 		})
 	}
+
 	return false
 }
 
 
-execute :: proc(command: string, params: []string) {
+execute :: proc(command: string, params: []string, out: ^os.File = os.stdout) {
 
 	process_cmd := [dynamic]string{command}
 	defer delete(process_cmd)
@@ -88,7 +118,7 @@ execute :: proc(command: string, params: []string) {
 
 	for !s.exited {}
 
-	if s.success do fmt.printf(string(stdout))
+	if s.success do fmt.fprintf(out, string(stdout))
 	else do fmt.printf(string(stderr))
 
 	return

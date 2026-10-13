@@ -1,6 +1,7 @@
 #+feature dynamic-literals
 package main
 
+import "core:mem"
 import "core:slice"
 import "base:runtime"
 import "core:bufio"
@@ -101,6 +102,22 @@ display_error :: proc(err: Exception) {
 }
 
 main :: proc() {
+	when ODIN_DEBUG {
+		track: mem.Tracking_Allocator
+		mem.tracking_allocator_init(&track, context.allocator)
+		context.allocator = mem.tracking_allocator(&track)
+
+		defer {
+			for _, entry in track.allocation_map {
+				fmt.eprintfln("%v leaked %v bytes", entry.location, entry.size)
+			}
+			for entry in track.bad_free_array {
+				fmt.eprintfln("%v bad free at %v", entry.location, entry.memory)
+			}
+			mem.tracking_allocator_destroy(&track)
+		}
+	}
+
 	builtins = {
 		"exit" = true,
 		"echo" = true,
