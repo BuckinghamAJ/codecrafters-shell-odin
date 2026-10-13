@@ -105,21 +105,21 @@ execute :: proc(command: string, params: []string, out: ^os.File = os.stdout) {
 		working_dir = "",
 		command = process_cmd[:],
 		env = nil,
-		stdin = nil,
-		stdout = nil,
-		stderr = nil,
+		stdin = os.stdin,
+		stdout = out,
+		stderr = os.stderr,
 	}
 
-	s, stdout, stderr , err :=  os.process_exec(process_desc, context.temp_allocator)
+	p, err :=  os.process_start(process_desc)
 	if err != nil {
 		display_error(Exception{err, fmt.tprintf("Error executing command %s: %v", command, err)})
 		return
 	}
 
-	for !s.exited {}
-
-	if s.success do fmt.fprintf(out, string(stdout))
-	else do fmt.printf(string(stderr))
+	_, err = os.process_wait(p)
+	if err != nil {
+		display_error(Exception{err, fmt.tprintf("Error waiting for command %s: %v", command, err)})
+	}
 
 	return
 }
