@@ -6,20 +6,27 @@ import "core:os"
 
 Shell_Operation :: enum {
 	Redirect_Stdout,
-	Redirect_Stderr
+	Redirect_Stderr,
+	Append_Stdout
 }
 
 contains_operation :: proc(params: []string) -> (op: Shell_Operation, contains: bool) {
 	for p in params {
 		switch p {
+		case ">>", "1>>": return .Append_Stdout, true
 		case ">", "1>": return .Redirect_Stdout, true
 		case "2>": return .Redirect_Stderr, true
-
 		}
 	}
 	return nil, false
 }
 
+@(rodata)
+FILE_OP_FLAGS := [Shell_Operation]os.File_Flags{
+	.Redirect_Stdout = {.Write, .Create, .Trunc},
+	.Redirect_Stderr = {.Write, .Create, .Trunc},
+	.Append_Stdout   = {.Write, .Create, .Append},
+}
 
 execute_command :: proc(command: string, params: []string) -> (should_exit: bool) {
 	args : []string
@@ -30,7 +37,7 @@ execute_command :: proc(command: string, params: []string) -> (should_exit: bool
 	if op, ok := contains_operation(params); ok{
 		args = params[:len(params)-2]
 		file_name := params[len(params)-1]
-		file, err := os.create(file_name)
+		file, err := os.open(file_name, FILE_OP_FLAGS[op])
 		if err != nil {
 			display_error(
 				Exception{err,
@@ -38,7 +45,7 @@ execute_command :: proc(command: string, params: []string) -> (should_exit: bool
 		}
 
 		switch op {
-		case .Redirect_Stdout:
+		case .Redirect_Stdout, .Append_Stdout:
 			stdout = file
 		case .Redirect_Stderr:
 			stderr = file
