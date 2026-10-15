@@ -4,34 +4,52 @@ package main
 import "core:fmt"
 import "core:os"
 
-contains_pipe :: proc(params: []string) -> bool {
-	for p in params {
-		if p == ">" do return true
-		if p == "1>" do return true
-	}
-	return false
+Shell_Operation :: enum {
+	Redirect_Stdout,
+	Redirect_Stderr
 }
+
+contains_operation :: proc(params: []string) -> (op: Shell_Operation, contains: bool) {
+	for p in params {
+		switch p {
+		case ">", "1>": return .Redirect_Stdout, true
+		case "2>": return .Redirect_Stderr, true
+
+		}
+	}
+	return nil, false
+}
+
 
 execute_command :: proc(command: string, params: []string) -> (should_exit: bool) {
 	args : []string
-	file : ^os.File
+	stdout := os.stdout
+	stderr := os.stderr
 
-	if contains_pipe(params){
+
+	if op, ok := contains_operation(params); ok{
 		args = params[:len(params)-2]
 		file_name := params[len(params)-1]
-		err: os.Error
-		file, err = os.create(file_name)
+		file, err := os.create(file_name)
 		if err != nil {
 			display_error(
 				Exception{err,
 				fmt.tprintf("Error creating file %s working directory: %v", file_name, err)})
 		}
+
+		switch op {
+		case .Redirect_Stdout:
+			stdout = file
+		case .Redirect_Stderr:
+			stderr = file
+		}
+
 	}
 	else do args = params
 
-	if file == nil do file = os.stdout
 	defer {
-		if file != os.stdout do os.close(file)
+		if stdout != os.stdout do os.close(stdout)
+		if stderr != os.stderr do os.close(stderr)
 	}
 
 	switch command {
@@ -39,17 +57,17 @@ execute_command :: proc(command: string, params: []string) -> (should_exit: bool
 		return true
 	case "echo":
 		for p, idx in args {
-			fmt.fprintf(file, p)
-			if len(args) - 1 != idx do fmt.fprint(file, " ")
+			fmt.fprintf(stdout, p)
+			if len(args) - 1 != idx do fmt.fprint(stdout, " ")
 		}
-		fmt.fprintln(file)
+		fmt.fprintln(stdout)
 	case "pwd":
 		cwd, err := os.get_working_directory(context.temp_allocator)
 		if err != nil {
 			display_error(Exception{err, fmt.tprintf("Error getting working directory: %v", err)})
 			break
 		}
-		fmt.fprintln(file, cwd)
+		fmt.fprintln(stdout, cwd)
 	case "cd":
 		if len(args) == 0 {
 			break
@@ -69,19 +87,19 @@ execute_command :: proc(command: string, params: []string) -> (should_exit: bool
 		param := args[0]
 
 		if _, exists := builtins[param]; exists {
-			fmt.fprintln(file, fmt.tprintf("%s is a shell builtin", param))
+			fmt.fprintln(stdout, fmt.tprintf("%s is a shell builtin", param))
 			break
 		}
 
 		if cmd_path, ok := path_search(param); ok {
-			fmt.fprintln(file, fmt.tprintf("%s is %s", param, cmd_path))
+			fmt.fprintln(stdout, fmt.tprintf("%s is %s", param, cmd_path))
 			break
 		}
 
 		fmt.println(fmt.tprintf("%s: not found", param))
 	case:
 		if cmd_path, ok := path_search(command); ok {
-			execute(command, args, file)
+			execute(command, args, stdout, stderr)
 			break
 		}
 
@@ -95,7 +113,7 @@ execute_command :: proc(command: string, params: []string) -> (should_exit: bool
 }
 
 
-execute :: proc(command: string, params: []string, out: ^os.File = os.stdout) {
+execute :: proc(command: string, params: []string, stdout: ^os.File = os.stdout, stderr: ^os.File = os.stderr) {
 
 	process_cmd := [dynamic]string{command}
 	defer delete(process_cmd)
@@ -106,8 +124,8 @@ execute :: proc(command: string, params: []string, out: ^os.File = os.stdout) {
 		command = process_cmd[:],
 		env = nil,
 		stdin = os.stdin,
-		stdout = out,
-		stderr = os.stderr,
+		stdout = stdout,
+		stderr = stderr,
 	}
 
 	p, err :=  os.process_start(process_desc)
