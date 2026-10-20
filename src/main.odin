@@ -1,6 +1,7 @@
 #+feature dynamic-literals
 package main
 
+import "core:sys/posix"
 import "core:mem"
 import "core:slice"
 import "base:runtime"
@@ -28,17 +29,54 @@ Exception :: struct {
 
 builtins : map[string]bool
 
-read_stdin :: proc() {
-	scanner: bufio.Scanner
+read_line :: proc(sb: ^strings.Builder) -> (line: string, ok: bool) {
+	orig : posix.termios
+	posix.tcgetattr(posix.STDIN_FILENO, &orig)
+	raw := orig
+	raw.c_lflag -= {.ICANON, .ECHO}
+	raw.c_cc[.VMIN] = 1
+	raw.c_cc[.VTIME] = 0
+	posix.tcsetattr(posix.STDIN_FILENO, .TCSANOW, &raw)
+	defer posix.tcsetattr(posix.STDIN_FILENO, .TCSANOW, &orig)
 
-	stdin := os.to_stream(os.stdin)
-	bufio.scanner_init(&scanner, stdin, context.temp_allocator)
+	strings.builder_reset(sb)
+	buf: [1]byte
+
+	for {
+		n, err := os.read(os.stdin, buf[:])
+		if n == 0 || err != nil do return "", false
+		switch buf[0] {
+		case '\t':
+			auto_complete := tab(sb, builtins)
+			strings.write_string(sb, auto_complete)
+			os.write_string(os.stdout, auto_complete)
+		case '\n', '\r':
+			os.write_string(os.stdout, "\n")
+			return strings.to_string(sb^), true
+		case 8, 127: //Backspace
+			if strings.builder_len(sb^) > 0 {
+				strings.pop_byte(sb)
+				os.write_string(os.stdout, "\b \b")
+			}
+		case:
+			strings.write_byte(sb, buf[0])
+			os.write(os.stdout, buf[:]) // manual echo
+		}
+
+	}
+
+}
+
+read_stdin :: proc() {
+	sb := strings.builder_make()
+	defer strings.builder_destroy(&sb)
 
 	for {
 		fmt.printf("$ ")
-		if !bufio.scanner_scan(&scanner) do break
 
-		line := bufio.scanner_text(&scanner)
+		line, ok := read_line(&sb)
+		if !ok do break
+
 		input := clean_input(line)
 		defer {
 			for i in input do delete(i)
