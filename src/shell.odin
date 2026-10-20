@@ -3,7 +3,7 @@ package main
 import "core:fmt"
 import "core:strings"
 
-tab :: proc(sb: ^strings.Builder, searchable_cmds: map[string]bool) -> (res: string, ring:bool) {
+tab :: proc(sb: ^strings.Builder, searchable_cmds: []string) -> (res: string, ring:bool) {
 	current_input := strings.to_string(sb^)
 
 	for builtin_cmd in searchable_cmds {

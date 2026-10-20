@@ -1,5 +1,6 @@
 package main
 
+import "core:slice"
 import "core:log"
 import "core:fmt"
 import "core:strings"
@@ -8,29 +9,36 @@ import "core:os"
 @(require_results)
 path_search :: proc(command: string) -> (path: string, found: bool) {
 	path_env := os.get_env("PATH", context.temp_allocator)
+
+	for dir in strings.split_iterator(&path_env, ":") {
+		full, _ := os.join_path({dir, command}, context.temp_allocator)
+		fi, err := os.stat(full, context.temp_allocator)
+		if err != nil do continue
+		if fi.type == .Regular && (fi.mode & os.Permissions_Execute_All) != {} {
+			return full, true
+		}
+	}
+
+	return "", false
+}
+
+get_all_path_cmd_names :: proc(allocator := context.allocator) -> (names: []string) {
+	res := make([dynamic]string, allocator)
+	path_env := os.get_env("PATH", context.temp_allocator)
 	paths := strings.split(path_env, ":")
 
-	for _path in paths {
-		info, err := os.read_all_directory_by_path(_path, context.temp_allocator)
+	for dir in strings.split_iterator(&path_env, ":")  {
+		info, err := os.read_all_directory_by_path(dir, context.temp_allocator)
 		if err != nil {
-			// TODO: Handle error properly instead of panicking
-			log.error(fmt.tprintf("Error reading directory %s: %v", _path, err))
+			log.error(fmt.tprintf("Error reading directory %s: %v", dir, err))
+			continue
 		}
 
 		for fi in info {
-			if fi.name == command && (fi.type == .Regular || fi.type == .Symlink) {
-				if (fi.mode & os.Permissions_Execute_All) == {} do break
-
-				path, err = os.join_path({_path, command}, context.temp_allocator)
-				if err != nil {
-					panic(fmt.tprintf("Error joining path %s and command %s: %v", _path, command, err))
-				}
-
-				return path, true
-			}
+			if fi.type == .Regular || fi.type == .Symlink do append(&res, strings.clone(fi.name, allocator ))
 		}
 
 	}
 
-	return "", false
+	return res[:]
 }

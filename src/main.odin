@@ -47,7 +47,16 @@ read_line :: proc(sb: ^strings.Builder) -> (line: string, ok: bool) {
 		if n == 0 || err != nil do return "", false
 		switch buf[0] {
 		case '\t':
-		 	auto_complete, ring := tab(sb, builtins)
+			builtin_keys, err := slice.map_keys(builtins, context.temp_allocator)
+			if err != nil {
+				fmt.println(err)
+				panic("SHOULD NOT FAIL HERE MAKING KEYS!")
+			}
+			cmds_in_path := get_all_path_cmd_names(context.temp_allocator)
+			cmds_to_autocomplete, _ := slice.concatenate([][]string{builtin_keys, cmds_in_path},
+				context.temp_allocator)
+
+		 	auto_complete, ring := tab(sb, cmds_to_autocomplete)
 			if ring do os.write_byte(os.stdout, '\x07')
 			else {
 				strings.write_string(sb, auto_complete)
@@ -75,6 +84,7 @@ read_stdin :: proc() {
 	defer strings.builder_destroy(&sb)
 
 	for {
+		defer free_all(context.temp_allocator)
 		fmt.printf("$ ")
 
 		line, ok := read_line(&sb)
