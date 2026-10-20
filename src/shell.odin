@@ -3,7 +3,7 @@ package main
 import "core:fmt"
 import "core:strings"
 
-tab :: proc(sb: ^strings.Builder, searchable_cmds: map[string]bool) -> string {
+tab :: proc(sb: ^strings.Builder, searchable_cmds: map[string]bool) -> (res: string, ring:bool) {
 	current_input := strings.to_string(sb^)
 
 	for builtin_cmd in searchable_cmds {
@@ -11,12 +11,10 @@ tab :: proc(sb: ^strings.Builder, searchable_cmds: map[string]bool) -> string {
 		if strings.starts_with(builtin_cmd, current_input) {
 			start_idx := len(builtin_cmd) - (len(builtin_cmd) - len(current_input))
 
-			if remaining, ok := strings.substring_from(builtin_cmd, start_idx); ok {
-				return fmt.tprintf("%s ", remaining)
-			}
-			else do return ""
+			remaining := strings.substring_from(builtin_cmd, start_idx) or_return
+			return fmt.tprintf("%s ", remaining), false
 		}
 	}
 
-	return ""
+	return "", true
 }

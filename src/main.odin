@@ -47,9 +47,12 @@ read_line :: proc(sb: ^strings.Builder) -> (line: string, ok: bool) {
 		if n == 0 || err != nil do return "", false
 		switch buf[0] {
 		case '\t':
-			auto_complete := tab(sb, builtins)
-			strings.write_string(sb, auto_complete)
-			os.write_string(os.stdout, auto_complete)
+		 	auto_complete, ring := tab(sb, builtins)
+			if ring do os.write_byte(os.stdout, '\x07')
+			else {
+				strings.write_string(sb, auto_complete)
+				os.write_string(os.stdout, auto_complete)
+			}
 		case '\n', '\r':
 			os.write_string(os.stdout, "\n")
 			return strings.to_string(sb^), true
