@@ -29,7 +29,13 @@ Exception :: struct {
 
 builtins : map[string]bool
 
-read_line :: proc(sb: ^strings.Builder) -> (line: string, ok: bool) {
+Shell_Action :: enum {
+	Exit,
+	ReLoop,
+	Execute
+}
+
+read_line :: proc(sb: ^strings.Builder) -> (line: string, action: Shell_Action) {
 	orig : posix.termios
 	posix.tcgetattr(posix.STDIN_FILENO, &orig)
 	raw := orig
@@ -39,12 +45,12 @@ read_line :: proc(sb: ^strings.Builder) -> (line: string, ok: bool) {
 	posix.tcsetattr(posix.STDIN_FILENO, .TCSANOW, &raw)
 	defer posix.tcsetattr(posix.STDIN_FILENO, .TCSANOW, &orig)
 
-	strings.builder_reset(sb)
 	buf: [1]byte
+	prev: byte
 
 	for {
 		n, err := os.read(os.stdin, buf[:])
-		if n == 0 || err != nil do return "", false
+		if n == 0 || err != nil do return "", .Exit
 		switch buf[0] {
 		case '\t':
 			builtin_keys, err := slice.map_keys(builtins, context.temp_allocator)
@@ -56,15 +62,22 @@ read_line :: proc(sb: ^strings.Builder) -> (line: string, ok: bool) {
 			cmds_to_autocomplete, _ := slice.concatenate([][]string{builtin_keys, cmds_in_path},
 				context.temp_allocator)
 
-		 	auto_complete, ring := tab(sb, cmds_to_autocomplete)
+			auto_complete, ring := tab(sb, cmds_to_autocomplete, rang_before = prev == '\t')
+
 			if ring do os.write_byte(os.stdout, '\x07')
 			else {
-				strings.write_string(sb, auto_complete)
-				os.write_string(os.stdout, auto_complete)
+				if prev == '\t' {
+					os.write_string(os.stdout, auto_complete)
+					return strings.to_string(sb^), .ReLoop
+				}
+				else {
+					strings.write_string(sb, auto_complete)
+					os.write_string(os.stdout, auto_complete)
+				}
 			}
 		case '\n', '\r':
 			os.write_string(os.stdout, "\n")
-			return strings.to_string(sb^), true
+			return strings.to_string(sb^), .Execute
 		case 8, 127: //Backspace
 			if strings.builder_len(sb^) > 0 {
 				strings.pop_byte(sb)
@@ -74,6 +87,7 @@ read_line :: proc(sb: ^strings.Builder) -> (line: string, ok: bool) {
 			strings.write_byte(sb, buf[0])
 			os.write(os.stdout, buf[:]) // manual echo
 		}
+		 prev = buf[0]
 
 	}
 
@@ -85,11 +99,16 @@ read_stdin :: proc() {
 
 	for {
 		defer free_all(context.temp_allocator)
-		fmt.printf("$ ")
+		fmt.printf("$ %s", strings.to_string(sb))
 
-		line, ok := read_line(&sb)
-		if !ok do break
-
+		line, action := read_line(&sb)
+	 	#partial switch action {
+		case .Exit:
+			return
+		case .ReLoop:
+			continue
+		}
+		defer strings.builder_reset(&sb)
 		input := clean_input(line)
 		defer {
 			for i in input do delete(i)
