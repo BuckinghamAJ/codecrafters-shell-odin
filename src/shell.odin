@@ -33,7 +33,10 @@ tab :: proc(sb: ^strings.Builder, searchable_cmds: []string, rang_before: bool =
 
 	log.debug(common)
 
-	if common[0] == current_input do return current_input, true
+	if common[0] == current_input {
+		if !rang_before do return current_input, true
+		else do return tab_print(current_input, r), false
+	}
 
 	if common[0] != "" do return tab_print(current_input, common, true), false
 
