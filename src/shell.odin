@@ -1,5 +1,6 @@
 package main
 
+import "core:log"
 import "core:slice"
 import "core:fmt"
 import "core:strings"
@@ -21,22 +22,37 @@ tab :: proc(sb: ^strings.Builder, searchable_cmds: []string, rang_before: bool =
 		return tab_print(current_input, r), false
 	}
 
+	log.debug(r)
+
+	common := []string{slice.reduce(r, "", proc(acc: string, s: string) -> string {
+		if acc == "" do return s
+		i := 0
+		for i < len(acc) && i < len(s) && acc[i] == s[i] do i+= 1
+		return s[:i]
+	})}
+
+	log.debug(common)
+
+	if common[0] != "" do return tab_print(current_input, common, true), false
+
 	if !rang_before do return "", true
 	else do return tab_print(current_input, r), false
 
 }
 
-tab_print :: proc(input: string, tab_cmds : []string) -> string{
+tab_print :: proc(input: string, tab_cmds : []string, prefix : bool = false) -> string{
 	if tab_cmds == nil do return ""
-	if len(tab_cmds) == 1 do return autocomplete(input, tab_cmds[0])
+	if len(tab_cmds) == 1 do return autocomplete(input, tab_cmds[0], !prefix)
 
 	return fmt.tprintf("\n%s\n", strings.join(tab_cmds, " ", context.temp_allocator))
 }
 
 @(private="file")
-autocomplete :: proc(input, cmd: string) -> string {
+autocomplete :: proc(input, cmd: string, add_space: bool = false) -> string {
 	start_idx := len(cmd) - (len(cmd) - len(input))
 	remaining, _ := strings.substring_from(cmd, start_idx)
+
+	if !add_space do return fmt.tprintf("%s", remaining)
 
 	return fmt.tprintf("%s ", remaining)
 }

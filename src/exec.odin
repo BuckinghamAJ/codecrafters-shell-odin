@@ -8,23 +8,27 @@ Shell_Operation :: enum {
 	Redirect_Stdout,
 	Redirect_Stderr,
 	Append_Stdout,
-	Append_Stderr
+	Append_Stderr,
 }
 
 contains_operation :: proc(params: []string) -> (op: Shell_Operation, contains: bool) {
 	for p in params {
 		switch p {
-		case ">>", "1>>": return .Append_Stdout, true
-		case "2>>": return .Append_Stderr, true
-		case ">", "1>": return .Redirect_Stdout, true
-		case "2>": return .Redirect_Stderr, true
+		case ">>", "1>>":
+			return .Append_Stdout, true
+		case "2>>":
+			return .Append_Stderr, true
+		case ">", "1>":
+			return .Redirect_Stdout, true
+		case "2>":
+			return .Redirect_Stderr, true
 		}
 	}
 	return nil, false
 }
 
 @(rodata)
-FILE_OP_FLAGS := [Shell_Operation]os.File_Flags{
+FILE_OP_FLAGS := [Shell_Operation]os.File_Flags {
 	.Redirect_Stdout = {.Write, .Create, .Trunc},
 	.Redirect_Stderr = {.Write, .Create, .Trunc},
 	.Append_Stdout   = {.Write, .Create, .Append},
@@ -32,18 +36,21 @@ FILE_OP_FLAGS := [Shell_Operation]os.File_Flags{
 }
 
 execute_command :: proc(command: string, params: []string) -> (should_exit: bool) {
-	args : []string
+	args: []string
 	stdout := os.stdout
 	stderr := os.stderr
 
-	if op, ok := contains_operation(params); ok{
-		args = params[:len(params)-2]
-		file_name := params[len(params)-1]
+	if op, ok := contains_operation(params); ok {
+		args = params[:len(params) - 2]
+		file_name := params[len(params) - 1]
 		file, err := os.open(file_name, FILE_OP_FLAGS[op])
 		if err != nil {
 			display_error(
-				Exception{err,
-				fmt.tprintf("Error creating file %s working directory: %v", file_name, err)})
+				Exception {
+					err,
+					fmt.tprintf("Error creating file %s working directory: %v", file_name, err),
+				},
+			)
 		}
 
 		switch op {
@@ -53,8 +60,7 @@ execute_command :: proc(command: string, params: []string) -> (should_exit: bool
 			stderr = file
 		}
 
-	}
-	else do args = params
+	} else do args = params
 
 	defer {
 		if stdout != os.stdout do os.close(stdout)
@@ -85,7 +91,7 @@ execute_command :: proc(command: string, params: []string) -> (should_exit: bool
 		param := args[0]
 
 		err := cd(param)
-		if err != Shell_Error.None{
+		if err != Shell_Error.None {
 			display_error(Exception{err, fmt.tprintf("cd: %s: No such file or directory", param)})
 			break
 		}
@@ -112,32 +118,36 @@ execute_command :: proc(command: string, params: []string) -> (should_exit: bool
 			break
 		}
 
-		display_error(Exception {
-			Shell_Error.Invalid_Command,
-			fmt.tprintf("%s: command not found", command),
-		})
+		display_error(
+			Exception{Shell_Error.Invalid_Command, fmt.tprintf("%s: command not found", command)},
+		)
 	}
 
 	return false
 }
 
 
-execute :: proc(command: string, params: []string, stdout: ^os.File = os.stdout, stderr: ^os.File = os.stderr) {
+execute :: proc(
+	command: string,
+	params: []string,
+	stdout: ^os.File = os.stdout,
+	stderr: ^os.File = os.stderr,
+) {
 
 	process_cmd := [dynamic]string{command}
 	defer delete(process_cmd)
 	append(&process_cmd, ..params)
 
-	process_desc := os.Process_Desc{
+	process_desc := os.Process_Desc {
 		working_dir = "",
-		command = process_cmd[:],
-		env = nil,
-		stdin = os.stdin,
-		stdout = stdout,
-		stderr = stderr,
+		command     = process_cmd[:],
+		env         = nil,
+		stdin       = os.stdin,
+		stdout      = stdout,
+		stderr      = stderr,
 	}
 
-	p, err :=  os.process_start(process_desc)
+	p, err := os.process_start(process_desc)
 	if err != nil {
 		display_error(Exception{err, fmt.tprintf("Error executing command %s: %v", command, err)})
 		return
@@ -145,7 +155,9 @@ execute :: proc(command: string, params: []string, stdout: ^os.File = os.stdout,
 
 	_, err = os.process_wait(p)
 	if err != nil {
-		display_error(Exception{err, fmt.tprintf("Error waiting for command %s: %v", command, err)})
+		display_error(
+			Exception{err, fmt.tprintf("Error waiting for command %s: %v", command, err)},
+		)
 	}
 
 	return

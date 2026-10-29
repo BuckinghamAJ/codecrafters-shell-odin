@@ -1,6 +1,7 @@
 #+feature dynamic-literals
 package main
 
+import "core:log"
 import "core:sys/posix"
 import "core:mem"
 import "core:slice"
@@ -187,6 +188,10 @@ main :: proc() {
 			mem.tracking_allocator_destroy(&track)
 		}
 	}
+
+ 	f, _ := os.open("/tmp/shell.log", os.O_WRONLY | os.O_CREATE | os.O_TRUNC)
+    context.logger = log.create_file_logger(f)
+    defer log.destroy_file_logger(context.logger)
 
 	builtins = {
 		"exit" = true,
