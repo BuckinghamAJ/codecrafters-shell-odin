@@ -5,11 +5,28 @@ import "core:slice"
 import "core:fmt"
 import "core:strings"
 
-tab :: proc(sb: ^strings.Builder, searchable_cmds: []string, rang_before: bool = false) -> (res: string, ring:bool) {
-	current_input := strings.to_string(sb^)
+@(require_results)
+build_exec_completions :: proc(allocator := context.allocator) -> []string {
+	builtin_keys, _ := slice.map_keys(builtins, context.temp_allocator)
+	all, _ := slice.concatenate([][]string{builtin_keys, get_all_path_cmd_names(allocator)}, allocator)
 
-	slice.sort(searchable_cmds)
-	cmds := slice.unique(searchable_cmds)
+	slice.sort(all)
+	return slice.unique(all)
+}
+
+@(require_results)
+build_file_completions :: proc(allocator := context.allocator) ->  []string {
+	res, err := get_files_in_cwd(allocator)
+	if err != nil {
+		panic(fmt.tprint("Should not fail getting files in cwd, %v", err))
+	}
+	slice.sort(res)
+
+	return res
+}
+
+tab :: proc(current_input: string, cmds: []string, rang_before: bool = false) -> (res: string, ring:bool) {
+	log.debug(cmds)
 
 	r := cmd_filter(cmds, current_input, proc(s: string, prefix: string) -> bool {
 		return strings.starts_with(s, prefix)

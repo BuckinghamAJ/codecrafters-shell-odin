@@ -36,6 +36,11 @@ Shell_Action :: enum {
 	Execute
 }
 
+Cli_Parts :: enum {
+	Command,
+	Parameter,
+}
+
 read_line :: proc(sb: ^strings.Builder) -> (line: string, action: Shell_Action) {
 	orig : posix.termios
 	posix.tcgetattr(posix.STDIN_FILENO, &orig)
@@ -48,22 +53,35 @@ read_line :: proc(sb: ^strings.Builder) -> (line: string, action: Shell_Action) 
 
 	buf: [1]byte
 	prev: byte
+	completions: []string = nil
+	file_completions : []string = nil
+	cli_part := Cli_Parts.Command
+
 
 	for {
 		n, err := os.read(os.stdin, buf[:])
 		if n == 0 || err != nil do return "", .Exit
 		switch buf[0] {
 		case '\t':
-			builtin_keys, err := slice.map_keys(builtins, context.temp_allocator)
-			if err != nil {
-				fmt.println(err)
-				panic("SHOULD NOT FAIL HERE MAKING KEYS!")
-			}
-			cmds_in_path := get_all_path_cmd_names(context.temp_allocator)
-			cmds_to_autocomplete, _ := slice.concatenate([][]string{builtin_keys, cmds_in_path},
-				context.temp_allocator)
+			input_so_far, _ := strings.split(strings.to_string(sb^), " ")
+			defer delete(input_so_far)
 
-			auto_complete, ring := tab(sb, cmds_to_autocomplete, rang_before = prev == '\t')
+			if len(input_so_far) > 1 do cli_part = .Parameter
+			else do cli_part = .Command
+
+			if completions == nil && cli_part == .Command do completions = build_exec_completions(context.temp_allocator)
+			if file_completions == nil && cli_part == .Parameter do file_completions = build_file_completions(context.temp_allocator)
+
+			auto_complete : string
+			ring : bool
+
+			switch cli_part {
+			case .Command:
+				auto_complete, ring = tab(strings.to_string(sb^), completions, rang_before = prev == '\t')
+			case .Parameter:
+				parameter := input_so_far[len(input_so_far)-1]
+				auto_complete, ring = tab(parameter, file_completions, rang_before = prev == '\t')
+			}
 
 			if ring do os.write_byte(os.stdout, '\x07')
 			else {
@@ -72,6 +90,7 @@ read_line :: proc(sb: ^strings.Builder) -> (line: string, action: Shell_Action) 
 					return strings.to_string(sb^), .ReLoop
 				}
 				else {
+					cli_part = .Parameter
 					strings.write_string(sb, auto_complete)
 					os.write_string(os.stdout, auto_complete)
 				}
