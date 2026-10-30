@@ -63,34 +63,35 @@ read_line :: proc(sb: ^strings.Builder) -> (line: string, action: Shell_Action) 
 		if n == 0 || err != nil do return "", .Exit
 		switch buf[0] {
 		case '\t':
-			input_so_far, _ := strings.split(strings.to_string(sb^), " ")
-			defer delete(input_so_far)
+			line := strings.to_string(sb^)
+			space_idx  := strings.last_index_byte(line, ' ') // -1 if none
+			prefix := line[space_idx+1:]
 
-			if len(input_so_far) > 1 do cli_part = .Parameter
-			else do cli_part = .Command
 
-			if completions == nil && cli_part == .Command do completions = build_exec_completions(context.temp_allocator)
-			if file_completions == nil && cli_part == .Parameter do file_completions = build_file_completions(context.temp_allocator)
+			if space_idx < 0 do cli_part = .Command
+			else do cli_part = .Parameter
 
-			auto_complete : string
-			ring : bool
+
+			options: []string
 
 			switch cli_part {
 			case .Command:
-				auto_complete, ring = tab(strings.to_string(sb^), completions, rang_before = prev == '\t')
+				if completions == nil && cli_part == .Command do completions = build_exec_completions(context.temp_allocator)
+				options = completions
 			case .Parameter:
-				parameter := input_so_far[len(input_so_far)-1]
-				auto_complete, ring = tab(parameter, file_completions, rang_before = prev == '\t')
+				if file_completions == nil && cli_part == .Parameter do file_completions = build_file_completions(context.temp_allocator)
+				options = file_completions
 			}
+
+			auto_complete, ring := tab(prefix, options, rang_before = prev == '\t')
 
 			if ring do os.write_byte(os.stdout, '\x07')
 			else {
 				if prev == '\t' {
 					os.write_string(os.stdout, auto_complete)
-					return strings.to_string(sb^), .ReLoop
+					return line, .ReLoop
 				}
 				else {
-					cli_part = .Parameter
 					strings.write_string(sb, auto_complete)
 					os.write_string(os.stdout, auto_complete)
 				}
